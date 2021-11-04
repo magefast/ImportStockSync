@@ -9,6 +9,11 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 
 class Settings
 {
+    public const CSV_COLUMN_NUM_SKU = 0;
+    public const CSV_COLUMN_NUM_QTY = 1;
+    public const CSV_COLUMN_NUM_PRICE = 2;
+    public const CSV_COLUMN_NUM_SPECIAL_PRICE = 3;
+
     /**
      * @var ScopeConfigInterface
      */
