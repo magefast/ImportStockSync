@@ -8,47 +8,91 @@ namespace Strekoza\ImportStockSync\Service;
 use Exception;
 use Magento\Framework\File\Csv;
 
-class Sync
+class SyncPrice
 {
-
-
     /**
      * @var array
      */
     private $errors = [];
 
     /**
+     * @var array
+     */
+    private $notices = [];
+
+    /**
      * @var Settings
      */
     private $settings;
 
+    /**
+     * @var Csv
+     */
     private $csv;
 
-    private $csvData;
+    /**
+     * @var array
+     */
+    private $csvData = [];
 
-    public function __construct(Settings $settings, Csv $csv)
+    /**
+     * @var UpdatePrice
+     */
+    private $updatePrice;
+
+    public function __construct(Settings $settings, Csv $csv, UpdatePrice $updatePrice)
     {
         $this->settings = $settings;
         $this->csv = $csv;
+        $this->updatePrice = $updatePrice;
     }
 
-    public function run()
+    /**
+     * @return array|null
+     */
+    public function getErrors(): ?array
     {
-        $this->syncData();
-        die('ruuuunn');
+        $this->errors = array_merge($this->updatePrice->getErrors());
+
+        if (count($this->errors) == 0) {
+            return null;
+        }
+
+        return $this->errors;
     }
 
+    /**
+     * @return array|null
+     */
+    public function getNotices(): ?array
+    {
+        $this->notices = array_merge($this->updatePrice->getNotices());
+
+        if (count($this->notices) == 0) {
+            return null;
+        }
+
+        return $this->notices;
+    }
 
     /**
      * @throws Exception
      */
-    private function syncData()
+    public function run()
+    {
+        $this->syncData();
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function syncData(): void
     {
         $file = $this->settings->getPathInternalFile();
 
         if (!file_exists($file)) {
             $this->errors[] = __('File Import not exist');
-            return false;
+            return;
         }
 
         $this->prepareFileToImportData($file);
@@ -57,9 +101,9 @@ class Sync
             $this->errors[] = __('Not rows to sync');
         }
 
-        var_dump($this->csvData);
-        die('---');
-        return true;
+        $this->updatePrice->updatePrice($this->csvData);
+
+
     }
 
     /**
@@ -70,7 +114,13 @@ class Sync
     {
         $csvData = $this->csv->getData($file);
 
+        $i = 0;
         foreach ($csvData as $c) {
+            $i++;
+            if ($i == 1) {
+                continue;
+            }
+
             $this->csvData[trim($c[Settings::CSV_COLUMN_NUM_SKU])] = [
                 'sku' => trim($c[Settings::CSV_COLUMN_NUM_SKU]),
                 'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
@@ -89,5 +139,4 @@ class Sync
     {
         return intval($string);
     }
-
 }
