@@ -6,7 +6,6 @@
 namespace Strekoza\ImportStockSync\Service;
 
 use Exception;
-use Magento\Framework\File\Csv;
 
 class SyncPrice
 {
@@ -26,25 +25,29 @@ class SyncPrice
     private $settings;
 
     /**
-     * @var Csv
-     */
-    private $csv;
-
-    /**
-     * @var array
-     */
-    private $csvData = [];
-
-    /**
      * @var UpdatePrice
      */
     private $updatePrice;
 
-    public function __construct(Settings $settings, Csv $csv, UpdatePrice $updatePrice)
+    /**
+     * @var PrepareFileToImport
+     */
+    private $prepareFileToImport;
+
+    /**
+     * @param Settings $settings
+     * @param UpdatePrice $updatePrice
+     * @param PrepareFileToImport $prepareFileToImport
+     */
+    public function __construct(
+        Settings            $settings,
+        UpdatePrice         $updatePrice,
+        PrepareFileToImport $prepareFileToImport
+    )
     {
         $this->settings = $settings;
-        $this->csv = $csv;
         $this->updatePrice = $updatePrice;
+        $this->prepareFileToImport = $prepareFileToImport;
     }
 
     /**
@@ -52,8 +55,6 @@ class SyncPrice
      */
     public function getErrors(): ?array
     {
-        $this->errors = array_merge($this->updatePrice->getErrors());
-
         if (count($this->errors) == 0) {
             return null;
         }
@@ -66,8 +67,6 @@ class SyncPrice
      */
     public function getNotices(): ?array
     {
-        $this->notices = array_merge($this->updatePrice->getNotices());
-
         if (count($this->notices) == 0) {
             return null;
         }
@@ -95,48 +94,15 @@ class SyncPrice
             return;
         }
 
-        $this->prepareFileToImportData($file);
+        $csvData = $this->prepareFileToImport->execute($file);
 
-        if (count($this->csvData) == 0) {
+        if (count($csvData) == 0) {
             $this->errors[] = __('Not rows to sync');
         }
 
-        $this->updatePrice->updatePrice($this->csvData);
+        $this->updatePrice->updatePrice($csvData);
 
-
-    }
-
-    /**
-     * @param string $file
-     * @throws Exception
-     */
-    private function prepareFileToImportData(string $file)
-    {
-        $csvData = $this->csv->getData($file);
-
-        $i = 0;
-        foreach ($csvData as $c) {
-            $i++;
-            if ($i == 1) {
-                continue;
-            }
-
-            $this->csvData[trim($c[Settings::CSV_COLUMN_NUM_SKU])] = [
-                'sku' => trim($c[Settings::CSV_COLUMN_NUM_SKU]),
-                'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
-                'in_stock' => $this->_prepareColumnDataInStock(trim($c[Settings::CSV_COLUMN_NUM_SKU])),
-                'price' => floatval($c[Settings::CSV_COLUMN_NUM_PRICE]),
-                'special_price' => floatval($c[Settings::CSV_COLUMN_NUM_SPECIAL_PRICE])
-            ];
-        }
-    }
-
-    /**
-     * @param string $string
-     * @return int
-     */
-    private function _prepareColumnDataInStock(string $string = ''): int
-    {
-        return intval($string);
+        $this->notices = array_merge($this->updatePrice->getNotices());
+        $this->errors = array_merge($this->updatePrice->getErrors());
     }
 }
