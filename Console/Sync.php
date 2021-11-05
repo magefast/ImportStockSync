@@ -1,30 +1,36 @@
 <?php
 /**
  * @author magefast@gmail.com www.magefast.com
- * @command php bin/magento sync:price
+ * @command php bin/magento sync:stock
  */
 
 namespace Strekoza\ImportStockSync\Console;
 
 use Exception;
-use Strekoza\ImportStockSync\Service\SyncPrice as ServiceSyncPrice;
+use Strekoza\ImportStockSync\Service\Sync as ServiceSync;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class SyncPrice extends Command
+class Sync extends Command
 {
-    private $serviceServiceSyncPrice;
+    private $serviceSync;
 
-    public function __construct(ServiceSyncPrice $serviceServiceSyncPrice)
+    /**
+     * @param ServiceSync $serviceSync
+     */
+    public function __construct(ServiceSync $serviceSync)
     {
-        $this->serviceServiceSyncPrice = $serviceServiceSyncPrice;
+        $this->serviceSync = $serviceSync;
         parent::__construct();
     }
 
+    /**
+     *
+     */
     protected function configure()
     {
-        $this->setName('sync:price');
+        $this->setName('sync:stock');
         $this->setDescription('Update Price data from Import file');
 
         parent::configure();
@@ -35,10 +41,10 @@ class SyncPrice extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->serviceServiceSyncPrice->run();
+        $this->serviceSync->run();
 
-        $errors = $this->serviceServiceSyncPrice->getErrors();
-        $notices = $this->serviceServiceSyncPrice->getNotices();
+        $errors = $this->serviceSync->getErrors();
+        $notices = $this->serviceSync->getNotices();
 
         if (!empty($errors)) {
             foreach ($errors as $error) {

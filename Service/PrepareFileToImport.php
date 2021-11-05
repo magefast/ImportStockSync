@@ -5,32 +5,25 @@
 
 namespace Strekoza\ImportStockSync\Service;
 
-use Exception;
-use Magento\Framework\File\Csv;
-
 class PrepareFileToImport
 {
     /**
-     * @var Csv
-     */
-    private $csv;
-
-    /**
-     * @param Csv $csv
-     */
-    public function __construct(Csv $csv)
-    {
-        $this->csv = $csv;
-    }
-
-    /**
      * @param string $file
      * @return array
-     * @throws Exception
      */
     public function execute(string $file): array
     {
-        $csvData = $this->csv->getData($file);
+        $csvData = [];
+
+        if (($handle = fopen($file, "r")) !== FALSE) {
+            while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) {
+                $csvData[] = $data;
+            }
+            fclose($handle);
+        }
+        unset($handle);
+        unset($data);
+
         $csvDataArray = [];
 
         $i = 0;
@@ -42,12 +35,16 @@ class PrepareFileToImport
 
             $csvDataArray[trim($c[Settings::CSV_COLUMN_NUM_SKU])] = [
                 'sku' => trim($c[Settings::CSV_COLUMN_NUM_SKU]),
-                'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
-                'in_stock' => $this->_prepareColumnDataInStock(trim($c[Settings::CSV_COLUMN_NUM_SKU])),
+                'status' => trim($c[Settings::CSV_COLUMN_NUM_STATUS]),
                 'price' => floatval($c[Settings::CSV_COLUMN_NUM_PRICE]),
-                'special_price' => floatval($c[Settings::CSV_COLUMN_NUM_SPECIAL_PRICE])
+                'special_price' => floatval($c[Settings::CSV_COLUMN_NUM_SPECIAL_PRICE]),
+                'stock_data' => [
+                    'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
+                    'is_in_stock' => $this->_prepareColumnDataInStock(trim($c[Settings::CSV_COLUMN_NUM_STOCK_STATUS])),
+                ]
             ];
         }
+        unset($csvData);
 
         return $csvDataArray;
     }
@@ -58,6 +55,10 @@ class PrepareFileToImport
      */
     private function _prepareColumnDataInStock(string $string = ''): int
     {
-        return intval($string);
+        if (in_array($string, Settings::CSV_STOCK_STATUS_VALUES_IN_STOCK)) {
+            return 1;
+        }
+
+        return 0;
     }
 }

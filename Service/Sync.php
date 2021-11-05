@@ -7,7 +7,7 @@ namespace Strekoza\ImportStockSync\Service;
 
 use Exception;
 
-class SyncPrice
+class Sync
 {
     /**
      * @var array
@@ -25,9 +25,9 @@ class SyncPrice
     private $settings;
 
     /**
-     * @var UpdatePrice
+     * @var UpdateProduct
      */
-    private $updatePrice;
+    private $updateProduct;
 
     /**
      * @var PrepareFileToImport
@@ -36,17 +36,17 @@ class SyncPrice
 
     /**
      * @param Settings $settings
-     * @param UpdatePrice $updatePrice
+     * @param UpdateProduct $updateProduct
      * @param PrepareFileToImport $prepareFileToImport
      */
     public function __construct(
         Settings            $settings,
-        UpdatePrice         $updatePrice,
+        UpdateProduct      $updateProduct,
         PrepareFileToImport $prepareFileToImport
     )
     {
         $this->settings = $settings;
-        $this->updatePrice = $updatePrice;
+        $this->updateProduct = $updateProduct;
         $this->prepareFileToImport = $prepareFileToImport;
     }
 
@@ -100,9 +100,9 @@ class SyncPrice
             $this->errors[] = __('Not rows to sync');
         }
 
-        $this->updatePrice->updatePrice($csvData);
+        $this->updateProduct->update($csvData);
 
-        $this->notices = array_merge($this->updatePrice->getNotices());
-        $this->errors = array_merge($this->updatePrice->getErrors());
+        $this->notices = array_merge($this->updateProduct->getNotices());
+        $this->errors = array_merge($this->updateProduct->getErrors());
     }
 }

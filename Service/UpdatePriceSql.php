@@ -8,17 +8,21 @@ namespace Strekoza\ImportStockSync\Service;
 use Exception;
 use Magento\Framework\App\ResourceConnection;
 
-class UpdatePrice
+class UpdatePriceSql
 {
-
-
     /**
      * @var array
      */
     private $errors = [];
 
+    /**
+     * @var array
+     */
     private $notices = [];
 
+    /**
+     * @var int
+     */
     private $updatedCount = 0;
 
     /**
@@ -41,6 +45,9 @@ class UpdatePrice
      */
     private $allSku = [];
 
+    /**
+     * @param ResourceConnection $connection
+     */
     public function __construct(ResourceConnection $connection)
     {
         $this->connection = $connection;
@@ -193,7 +200,6 @@ class UpdatePrice
                 $this->allSku[$d] = $d;
             }
         }
-
 
         if (isset($this->allSku[$sku])) {
             return true;

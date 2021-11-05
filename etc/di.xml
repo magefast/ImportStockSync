@@ -3,7 +3,7 @@
     <type name="Magento\Framework\Console\CommandList">
         <arguments>
             <argument name="commands" xsi:type="array">
-                <item name="importSyncPrice" xsi:type="object">Strekoza\ImportStockSync\Console\SyncPrice</item>
+                <item name="importSync" xsi:type="object">Strekoza\ImportStockSync\Console\Sync</item>
             </argument>
         </arguments>
     </type>
