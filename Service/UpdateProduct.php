@@ -6,10 +6,8 @@
 namespace Strekoza\ImportStockSync\Service;
 
 use Exception;
-use Magento\Catalog\Model\ResourceModel\Product\Action;
-use Magento\CatalogInventory\Api\StockRegistryInterface;
-use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
+use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
 
 class UpdateProduct
@@ -30,11 +28,6 @@ class UpdateProduct
     private $updatedCount = 0;
 
     /**
-     * @var ResourceConnection
-     */
-    private $connection;
-
-    /**
      * @var array
      */
     private $allSku = [];
@@ -50,27 +43,42 @@ class UpdateProduct
     private $storeManager;
 
     /**
-     * @var Action
+     * @var ProductCollectionFactory
      */
-    private $productAction;
+    private $productCollectionFactory;
 
     /**
-     * @var StockRegistryInterface
+     * @var UpdateAttributes
      */
-    private $stockRegistry;
+    private $updateAttributes;
 
+    /**
+     * @var UpdateStock
+     */
+    private $updateStock;
+
+    /**
+     * @var int
+     */
+    private $totalRowToUpdate = 0;
+
+    /**
+     * @param StoreManagerInterface $storeManager
+     * @param ProductCollectionFactory $productCollectionFactory
+     * @param UpdateAttributes $updateAttributes
+     * @param UpdateStock $updateStock
+     */
     public function __construct(
-        ResourceConnection     $connection,
-        StoreManagerInterface  $storeManager,
-        Action                 $productAction,
-        StockRegistryInterface $stockRegistry
-
+        StoreManagerInterface    $storeManager,
+        ProductCollectionFactory $productCollectionFactory,
+        UpdateAttributes         $updateAttributes,
+        UpdateStock              $updateStock
     )
     {
-        $this->connection = $connection;
         $this->storeManager = $storeManager;
-        $this->productAction = $productAction;
-        $this->stockRegistry = $stockRegistry;
+        $this->productCollectionFactory = $productCollectionFactory;
+        $this->updateAttributes = $updateAttributes;
+        $this->updateStock = $updateStock;
     }
 
     /**
@@ -91,10 +99,15 @@ class UpdateProduct
 
     /**
      * @param array $data
+     * @param int $websiteId
      */
-    public function update(array $data): void
+    public function update(array $data, int $websiteId): void
     {
-        $this->prepareProductsData();
+        $this->allSku = [];
+        $this->storeIds = [];
+        $this->totalRowToUpdate = count($data);
+
+        $this->prepareProductsData($websiteId);
 
         $count = 0;
 
@@ -102,7 +115,7 @@ class UpdateProduct
             $count++;
             $sku = $d['sku'];
 
-            if (!$this->checkIfSkuExists($sku)) {
+            if (!$this->checkIfSkuExists($sku, $websiteId)) {
                 $this->errors[] = $count . ' row. FAILURE:: Product with SKU (' . $sku . ') doesn\'t exist.';
                 continue;
             }
@@ -110,55 +123,70 @@ class UpdateProduct
             $id = $this->allSku[$sku];
 
             try {
-                $this->updateProductData($id, $d);
-                $this->updateProductStockData($id, $sku, $d);
+                $this->updateProductData($id, $d, $websiteId);
+                $this->updateProductStockData($id, $d, $websiteId);
 
                 $this->updatedCount++;
             } catch (Exception $e) {
                 $this->errors[] = $count . ' row. ERROR:: While updating  SKU (' . $sku . ') => ' . $e->getMessage();
             }
+
+            $this->totalRowToUpdate--;
         }
 
-        $this->notices[] = __('Total Price updated count: ' . $this->updatedCount);
+        $this->updateStock->finalizeUpdateStock($websiteId);
+
+        $this->notices[] = __('Updated for Website ID: ' . $websiteId . '; Total updated count: ' . $this->updatedCount);
     }
 
     /**
      * @throws Exception
      */
-    private function updateProductData(int $id, $data)
+    private function updateProductData(int $id, $data, int $websiteId)
     {
         unset($data['stock_data']);
+        unset($data['sku']);
 
-        $storeIds = $this->getStoreIds();
+        $storeIds = $this->getStoreIds($websiteId);
+
+        //$times = [];
+
         foreach ($storeIds as $storeId) {
-            $this->productAction->updateAttributes([$id], $data, $storeId);
+            //$start = microtime(true);
+            $this->updateAttributes->updateAttributesCustom($id, $data, $storeId, $this->totalRowToUpdate);
+            //$times[] = microtime(true) - $start;
         }
+        //var_dump((array_sum($times) / count($times)));
     }
 
     /**
-     * @throws NoSuchEntityException
+     *
      */
-    private function updateProductStockData(int $id, string $sku, $data): void
+    private function updateProductStockData(int $id, array $data, int $websiteId): void
     {
+        //$times = [];
+        //$start = microtime(true);
+
         $data = $data['stock_data'];
 
         if (isset($data['qty'])) {
-            $stockItem = $this->stockRegistry->getStockItemBySku($sku);
-            $stockItem->setQty($data['qty']);
-            $stockItem->setIsInStock($data['is_in_stock']);
-            $stockItem->save();
+            $this->updateStock->updateQty($id, $data['qty'], $data['is_in_stock'], $this->totalRowToUpdate);
+            $this->updateStock->updateStatus($id, $data['is_in_stock'], $data['qty'], $websiteId);
         }
-    }
 
+        //$times[] = microtime(true) - $start;
+        //var_dump((array_sum($times) / count($times)));
+    }
 
     /**
      * @param $sku
+     * @param int $websiteId
      * @return bool
      */
-    private function checkIfSkuExists($sku): bool
+    private function checkIfSkuExists($sku, int $websiteId): bool
     {
         if (empty($this->allSku)) {
-            $this->prepareProductsData();
+            $this->prepareProductsData($websiteId);
         }
 
         if (isset($this->allSku[$sku])) {
@@ -171,16 +199,17 @@ class UpdateProduct
     /**
      *
      */
-    private function prepareProductsData(): void
+    private function prepareProductsData(int $websiteId): void
     {
         if (empty($this->allSku)) {
-            $connection = $this->connection->getConnection('core_read');
-            $table = $this->connection->getTableName('catalog_product_entity');
 
-            $sql = "SELECT entity_id, sku FROM " . $table;
-            $dataSql = $connection->fetchAll($sql);
+            $productCollection = $this->productCollectionFactory->create();
+            $productCollection->addAttributeToSelect(['sku']);
+            $productCollection->addWebsiteFilter($websiteId);
 
-            foreach ($dataSql as $k => $v) {
+            $rows = (array)$productCollection->toArray();
+
+            foreach ($rows as $v) {
                 if (!empty($v['sku'])) {
                     $this->allSku[$v['sku']] = $v['entity_id'];
                 }
@@ -189,14 +218,31 @@ class UpdateProduct
     }
 
     /**
+     * @param int $websiteId
      * @return array
      */
-    private function getStoreIds(): array
+    private function getStoreIds(int $websiteId): array
     {
         if (empty($this->storeIds)) {
-            $this->storeIds = array_keys($this->storeManager->getStores());
+            $stores = $this->storeManager->getStoreByWebsiteId($websiteId);
+
+            foreach ($stores as $storeId) {
+                $this->storeIds[intval($storeId)] = intval($storeId);
+            }
+
+            if ($websiteId === Settings::DEFAULT_SYNC_WEBSITE) {
+                $this->storeIds[Store::DEFAULT_STORE_ID] = Store::DEFAULT_STORE_ID;
+            }
         }
 
         return $this->storeIds;
+    }
+
+    /**
+     * @return int
+     */
+    public function getUpdatedCount(): int
+    {
+        return $this->updatedCount;
     }
 }

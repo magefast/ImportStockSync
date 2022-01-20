@@ -6,6 +6,13 @@
 namespace Strekoza\ImportStockSync\Service;
 
 use Exception;
+use Magento\Catalog\Model\Indexer\Product\Eav\Processor as EavProcessor;
+use Magento\Catalog\Model\Indexer\Product\Price\Processor as PriceProcessor;
+use Magento\CatalogInventory\Model\Indexer\Stock\Processor;
+use Magento\CatalogRule\Model\Indexer\Product\ProductRuleProcessor;
+use Magento\CatalogRule\Model\Indexer\Rule\RuleProductProcessor;
+use Magento\InventoryIndexer\Indexer\InventoryIndexer;
+use Magento\Store\Model\StoreManagerInterface;
 
 class Sync
 {
@@ -35,19 +42,82 @@ class Sync
     private $prepareFileToImport;
 
     /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var Processor
+     */
+    private $stockIndexerProcessor;
+
+    /**
+     * @var PriceProcessor
+     */
+    private $priceIndexerProcessor;
+
+    /**
+     * @var InventoryIndexer
+     */
+    private $inventoryIndexerProcessor;
+
+    /**
+     * @var EavProcessor
+     */
+    private $eavIndexerProcessor;
+
+    /**
+     * @var RuleProductProcessor
+     */
+    private $ruleProductIndexerProcessor;
+
+    /**
+     * @var ProductRuleProcessor
+     */
+    private $productRuleIndexerProcessor;
+
+    /**
+     * @var FlagSync
+     */
+    private $flagSync;
+
+    /**
      * @param Settings $settings
      * @param UpdateProduct $updateProduct
      * @param PrepareFileToImport $prepareFileToImport
+     * @param StoreManagerInterface $storeManager
+     * @param Processor $stockIndexerProcessor
+     * @param PriceProcessor $priceIndexerProcessor
+     * @param ProductRuleProcessor $productRuleIndexerProcessor
+     * @param RuleProductProcessor $ruleProductIndexerProcessor
+     * @param EavProcessor $eavIndexerProcessor
+     * @param FlagSync $flagSync
      */
     public function __construct(
-        Settings            $settings,
-        UpdateProduct      $updateProduct,
-        PrepareFileToImport $prepareFileToImport
+        Settings              $settings,
+        UpdateProduct         $updateProduct,
+        PrepareFileToImport   $prepareFileToImport,
+        StoreManagerInterface $storeManager,
+        Processor             $stockIndexerProcessor,
+        PriceProcessor        $priceIndexerProcessor,
+        //InventoryIndexer      $inventoryIndexerProcessor,
+        ProductRuleProcessor  $productRuleIndexerProcessor,
+        RuleProductProcessor  $ruleProductIndexerProcessor,
+        EavProcessor          $eavIndexerProcessor,
+        FlagSync              $flagSync
     )
     {
         $this->settings = $settings;
         $this->updateProduct = $updateProduct;
         $this->prepareFileToImport = $prepareFileToImport;
+        $this->storeManager = $storeManager;
+        $this->stockIndexerProcessor = $stockIndexerProcessor;
+        $this->priceIndexerProcessor = $priceIndexerProcessor;
+        //$this->inventoryIndexerProcessor = $inventoryIndexerProcessor;
+        $this->productRuleIndexerProcessor = $productRuleIndexerProcessor;
+        $this->ruleProductIndexerProcessor = $ruleProductIndexerProcessor;
+        $this->eavIndexerProcessor = $eavIndexerProcessor;
+        $this->flagSync = $flagSync;
     }
 
     /**
@@ -79,7 +149,30 @@ class Sync
      */
     public function run()
     {
+        if ($this->flagSync->get() == true) {
+            $this->errors[] = __('Sync is Running. Please try in 10 minutes.');
+            return;
+        }
+
+        $this->flagSync->setFlag(1);
+
+        $start = microtime(true);
+
         $this->syncData();
+
+        if ($this->updateProduct->getUpdatedCount() > 0) {
+            $this->ruleProductIndexerProcessor->reindexAll();
+            $this->eavIndexerProcessor->reindexAll();
+            //$this->inventoryIndexerProcessor->executeFull();
+            $this->productRuleIndexerProcessor->reindexAll();
+            $this->stockIndexerProcessor->reindexAll();
+            $this->priceIndexerProcessor->reindexAll();
+        }
+
+        $this->flagSync->setFlag(0);
+
+        $times = microtime(true) - $start;
+        $this->notices[] = __('Sync take time(sec.): ') . $times;
     }
 
     /**
@@ -87,22 +180,40 @@ class Sync
      */
     private function syncData(): void
     {
-        $file = $this->settings->getPathInternalFile();
+        $websiteIds = $this->getWebsiteIds();
 
-        if (!file_exists($file)) {
-            $this->errors[] = __('File Import not exist');
-            return;
+        foreach ($websiteIds as $websiteId) {
+            $websiteId = intval($websiteId);
+
+            if ($this->settings->isEnabled($websiteId)) {
+                $file = $this->settings->getPathInternalFile($websiteId);
+
+                if (!file_exists($file)) {
+                    $this->errors[] = __('File Import not exist');
+                    return;
+                }
+
+                $csvData = $this->prepareFileToImport->execute($file, $websiteId);
+
+                if (count($csvData) == 0) {
+                    $this->errors[] = __('Not rows to sync');
+                }
+
+                $this->updateProduct->update($csvData, $websiteId);
+
+                unlink($file);
+            }
         }
-
-        $csvData = $this->prepareFileToImport->execute($file);
-
-        if (count($csvData) == 0) {
-            $this->errors[] = __('Not rows to sync');
-        }
-
-        $this->updateProduct->update($csvData);
 
         $this->notices = array_merge($this->updateProduct->getNotices());
         $this->errors = array_merge($this->updateProduct->getErrors());
+    }
+
+    /**
+     * @return array
+     */
+    private function getWebsiteIds(): array
+    {
+        return array_keys($this->storeManager->getWebsites());
     }
 }
