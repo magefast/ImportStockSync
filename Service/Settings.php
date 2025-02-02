@@ -12,15 +12,14 @@ class Settings
 {
     public const DEFAULT_SYNC_WEBSITE = 1;
 
-    public const CSV_COLUMN_NUM_SKU = 4;
+    public const CSV_COLUMN_NUM_SKU = 0;
     public const CSV_COLUMN_NUM_PRICE = 6;
-    public const CSV_COLUMN_NUM_QTY = 7;
-    public const CSV_COLUMN_NUM_STOCK_STATUS = 8;
-    public const CSV_COLUMN_NUM_STATUS = 9;
+    public const CSV_COLUMN_NUM_CENA_ZAKUPKI = 7;
+    public const CSV_COLUMN_NUM_PROFIT = 8;
+    public const CSV_COLUMN_NUM_QTY = 9;
     public const CSV_COLUMN_NUM_OLD_PRICE = 10;
-    public const CSV_STOCK_STATUS_VALUES_IN_STOCK = ['7', '5'];
-    public const ATTRIBUTE_STATUS_VALUES_ENABLED = 1;
-    public const ATTRIBUTE_STATUS_VALUES_DISABLED = 2;
+    public const CSV_COLUMN_NUM_SPECIAL_PRICE = 16;
+    public const CSV_COLUMN_NUM_ROZETKA_PRICE = 17;
 
     /**
      * @var ScopeConfigInterface

@@ -27,6 +27,6 @@ php bin/magento sync:stock
 #### Run sync also can via URL link
 * http://magento.local/importdocksync
 
-<hr>
+-----
 
-## Install with Composer `composer require strekoza/module-import-stock-sync`
+###  Install with Composer `composer require strekoza/module-import-stock-sync`

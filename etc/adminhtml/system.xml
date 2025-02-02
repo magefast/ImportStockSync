@@ -2,41 +2,20 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
-        <section id="importStockSync"
-                 translate="label"
-                 type="text"
-                 sortOrder="999"
-                 showInDefault="1"
-                 showInWebsite="1"
+        <section id="importStockSync" translate="label" type="text" sortOrder="999" showInDefault="1" showInWebsite="1"
                  showInStore="0">
             <class>separator-top</class>
             <label>Import Stock Sync</label>
             <tab>service</tab>
             <resource>Strekoza_ImportStockSync::config</resource>
-            <group id="settings"
-                   translate="label"
-                   type="text" sortOrder="10"
-                   showInDefault="1"
-                   showInWebsite="1"
+            <group id="settings" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1"
                    showInStore="0">
                 <label>Import Stock Sync Settings</label>
-                <field id="status"
-                       translate="label"
-                       type="select"
-                       sortOrder="10"
-                       showInDefault="1"
-                       showInWebsite="1"
-                       showInStore="0">
+                <field id="status" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Enable</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="path_internal_file"
-                       type="text"
-                       translate="label"
-                       showInDefault="1"
-                       showInWebsite="1"
-                       showInStore="0"
-                       sortOrder="20">
+                <field id="path_internal_file" type="text" translate="label" showInDefault="1" showInWebsite="1" showInStore="0" sortOrder="20">
                     <label>Full Server Path to Import Stock file</label>
                 </field>
             </group>

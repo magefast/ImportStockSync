@@ -9,6 +9,7 @@ use Exception;
 use Magento\Catalog\Model\ResourceModel\Product\Action;
 use Magento\Eav\Model\Entity\Attribute\AbstractAttribute;
 use Magento\Framework\DataObject;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 
 class UpdateAttributes extends Action
@@ -91,6 +92,7 @@ class UpdateAttributes extends Action
     /**
      * @param $attrCode
      * @return false|AbstractAttribute|mixed
+     * @throws LocalizedException
      */
     private function getAttributeByCode($attrCode)
     {

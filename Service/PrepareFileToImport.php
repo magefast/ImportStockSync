@@ -5,8 +5,27 @@
 
 namespace Strekoza\ImportStockSync\Service;
 
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\CatalogInventory\Api\Data\StockItemInterface;
+use Magento\CatalogInventory\Ui\DataProvider\Product\Form\Modifier\AdvancedInventory;
+use Strekoza\ImportStockSync\Api\SettingsInterface;
+use Strekoza\ImportStockSync\Logger\Logger;
+
 class PrepareFileToImport
 {
+    /**
+     * @var Logger
+     */
+    private $logger;
+
+    /**
+     * @param Logger $logger
+     */
+    public function __construct(Logger $logger)
+    {
+        $this->logger = $logger;
+    }
+
     /**
      * @param string $file
      * @param int $id
@@ -34,17 +53,40 @@ class PrepareFileToImport
                 continue;
             }
 
+            $price = floatval(str_replace(",", ".", $c[Settings::CSV_COLUMN_NUM_PRICE]));
+            $priceSpecial = floatval(str_replace(",", ".", $c[Settings::CSV_COLUMN_NUM_SPECIAL_PRICE]));
+
+            $specialPriceData = '';
+            $specialFromData = '';
+            $specialToData = '';
+
+            if ($price == 0) {
+                $this->logger->info('Price 0. SKU:' . $c[Settings::CSV_COLUMN_NUM_SKU]);
+                continue;
+            }
+
+            if (!empty($price2) && $price2 > 0) {
+                $price2 = floatval(str_replace(",", ".", $price2));
+                $specialPriceData = $this->_prepareColumnDataSpecialPrice($price, $priceSpecial);
+                //@todo
+                $specialFromData = '';
+                $specialToData = '';
+            }
+
             $csvDataArray[trim($c[Settings::CSV_COLUMN_NUM_SKU])] = [
-                'sku' => trim($c[Settings::CSV_COLUMN_NUM_SKU]),
-                'status' => $this->_prepareColumnDataStatus(trim($c[Settings::CSV_COLUMN_NUM_STATUS])),
-                'price' => $this->_prepareColumnDataPrice(floatval($c[Settings::CSV_COLUMN_NUM_PRICE]), floatval($c[Settings::CSV_COLUMN_NUM_OLD_PRICE])),
-                'special_price' => $this->_prepareColumnDataSpecialPrice(floatval($c[Settings::CSV_COLUMN_NUM_PRICE]), floatval($c[Settings::CSV_COLUMN_NUM_OLD_PRICE])),
-                'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
-                'is_in_stock' => $this->_prepareColumnDataInStock(trim($c[Settings::CSV_COLUMN_NUM_STOCK_STATUS])),
-                'time_delivery' => '',
-                'stock_data' => [
-                    'qty' => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
-                    'is_in_stock' => $this->_prepareColumnDataInStock(trim($c[Settings::CSV_COLUMN_NUM_STOCK_STATUS])),
+                ProductInterface::SKU => trim($c[Settings::CSV_COLUMN_NUM_SKU]),
+                ProductInterface::PRICE => $price,
+                SettingsInterface::ATTRIBUTE_SPECIAL_PRICE => $specialPriceData,
+                SettingsInterface::ATTRIBUTE_SPECIAL_FROM => $specialFromData,
+                SettingsInterface::ATTRIBUTE_SPECIAL_TO => $specialToData,
+                StockItemInterface::QTY => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
+                StockItemInterface::IS_IN_STOCK => intval($c[Settings::CSV_COLUMN_NUM_QTY]) > 0 ? 1 : 0,
+                SettingsInterface::ATTRIBUTE_CENA_ZAKUPKI => trim($c[Settings::CSV_COLUMN_NUM_CENA_ZAKUPKI]),
+                SettingsInterface::ATTRIBUTE_PROFIT => trim($c[Settings::CSV_COLUMN_NUM_PROFIT]),
+                SettingsInterface::ATTRIBUTE_ROZETKA_PRICE => trim($c[Settings::CSV_COLUMN_NUM_ROZETKA_PRICE]),
+                AdvancedInventory::STOCK_DATA_FIELDS => [
+                    StockItemInterface::QTY => intval($c[Settings::CSV_COLUMN_NUM_QTY]),
+                    StockItemInterface::IS_IN_STOCK => intval($c[Settings::CSV_COLUMN_NUM_QTY]) > 0 ? 1 : 0,
                 ]
             ];
         }
@@ -54,55 +96,14 @@ class PrepareFileToImport
     }
 
     /**
-     * @param string $string
-     * @return int
-     */
-    private function _prepareColumnDataInStock(string $string = ''): int
-    {
-        if (in_array($string, Settings::CSV_STOCK_STATUS_VALUES_IN_STOCK)) {
-            return 1;
-        }
-
-        return 0;
-    }
-
-    /**
-     * @param string $string
-     * @return int
-     */
-    private function _prepareColumnDataStatus(string $string = ''): int
-    {
-        $string = intval($string);
-        if ($string === Settings::ATTRIBUTE_STATUS_VALUES_ENABLED) {
-            return Settings::ATTRIBUTE_STATUS_VALUES_ENABLED;
-        }
-
-        return Settings::ATTRIBUTE_STATUS_VALUES_DISABLED;
-    }
-
-    /**
      * @param float $price
-     * @param float $oldPrice
-     * @return float
-     */
-    private function _prepareColumnDataPrice(float $price, float $oldPrice)
-    {
-        if ($oldPrice > 0 && $oldPrice > $price) {
-            return $oldPrice;
-        }
-
-        return $price;
-    }
-
-    /**
-     * @param float $price
-     * @param float $oldPrice
+     * @param float $specialPrice
      * @return float|string
      */
-    private function _prepareColumnDataSpecialPrice(float $price, float $oldPrice)
+    private function _prepareColumnDataSpecialPrice(float $price, float $specialPrice)
     {
-        if ($oldPrice > 0 && $oldPrice > $price) {
-            return $price;
+        if ($specialPrice > 0 && $price > $specialPrice) {
+            return $specialPrice;
         }
 
         return '';
