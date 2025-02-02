@@ -2,7 +2,6 @@
 
 # Magento 2 module - Strekoza_ImportStockSync
 
-
  **Import Stock/Price data (qty, stock status), update Price data**
 
 <br/>
@@ -28,3 +27,6 @@ php bin/magento sync:stock
 #### Run sync also can via URL link
 * http://magento.local/importdocksync
 
+<hr>
+
+## Install with Composer `composer require strekoza/module-import-stock-sync`
