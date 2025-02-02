@@ -7,6 +7,7 @@ namespace Strekoza\ImportStockSync\Service;
 
 use Exception;
 use Magento\Framework\App\ResourceConnection;
+use Strekoza\ImportStockSync\Logger\Logger;
 
 class UpdatePriceSql
 {
@@ -46,11 +47,18 @@ class UpdatePriceSql
     private $allSku = [];
 
     /**
-     * @param ResourceConnection $connection
+     * @var Logger
      */
-    public function __construct(ResourceConnection $connection)
+    private $logger;
+
+    /**
+     * @param ResourceConnection $connection
+     * @param Logger $logger
+     */
+    public function __construct(ResourceConnection $connection, Logger $logger)
     {
         $this->connection = $connection;
+        $this->logger = $logger;
     }
 
     /**
@@ -82,7 +90,7 @@ class UpdatePriceSql
             $price = $d['price'];
 
             if (!$this->checkIfSkuExists($sku)) {
-                $this->errors[] = $count . ' row. FAILURE:: Product with SKU (' . $sku . ') doesn\'t exist.';
+                $this->addError($count . ' row. FAILURE:: Product with SKU (' . $sku . ') doesn\'t exist.');
                 continue;
             }
 
@@ -92,11 +100,45 @@ class UpdatePriceSql
 
                 //$message = $count . '. SUCCESS:: Updated SKU (' . $sku . ') with price (' . $price . ')';
             } catch (Exception $e) {
-                $this->errors[] = $count . ' row. ERROR:: While updating  SKU (' . $sku . ') with Price (' . $price . ') => ' . $e->getMessage();
+                $this->addError($count . ' row. ERROR:: While updating  SKU (' . $sku . ') with Price (' . $price . ') => ' . $e->getMessage());
             }
         }
 
-        $this->notices[] = __('Total Price updated count: ' . $this->updatedCount);
+        $this->addNotice(__('Total Price updated count: ' . $this->updatedCount));
+    }
+
+    /**
+     * @param $sku
+     * @return bool
+     */
+    private function checkIfSkuExists($sku): bool
+    {
+        if (empty($this->allSku)) {
+            $connection = $this->connection->getConnection('core_read');
+            $table = $this->connection->getTableName('catalog_product_entity');
+
+            $sql = "SELECT sku FROM " . $table;
+            $dataSql = $connection->fetchCol($sql);
+
+            foreach ($dataSql as $d) {
+                $this->allSku[$d] = $d;
+            }
+        }
+
+        if (isset($this->allSku[$sku])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $value
+     */
+    public function addError($value)
+    {
+        $this->errors[] = $value;
+        $this->logger->error($value);
     }
 
     /**
@@ -123,6 +165,20 @@ class UpdatePriceSql
                 $price
             ]
         );
+    }
+
+    /**
+     * @param string $sku
+     * @return int
+     */
+    private function getIdFromSku(string $sku): int
+    {
+        $connection = $this->connection->getConnection('core_read');
+        $table = $this->connection->getTableName('catalog_product_entity');
+
+        $sql = "SELECT entity_id FROM " . $table . " WHERE sku = ?";
+
+        return $connection->fetchOne($sql, [$sku]);
     }
 
     /**
@@ -170,41 +226,11 @@ class UpdatePriceSql
     }
 
     /**
-     * @param string $sku
-     * @return int
+     * @param $value
      */
-    private function getIdFromSku(string $sku): int
+    public function addNotice($value)
     {
-        $connection = $this->connection->getConnection('core_read');
-        $table = $this->connection->getTableName('catalog_product_entity');
-
-        $sql = "SELECT entity_id FROM " . $table . " WHERE sku = ?";
-
-        return $connection->fetchOne($sql, [$sku]);
-    }
-
-    /**
-     * @param $sku
-     * @return bool
-     */
-    private function checkIfSkuExists($sku): bool
-    {
-        if (empty($this->allSku)) {
-            $connection = $this->connection->getConnection('core_read');
-            $table = $this->connection->getTableName('catalog_product_entity');
-
-            $sql = "SELECT sku FROM " . $table;
-            $dataSql = $connection->fetchCol($sql);
-
-            foreach ($dataSql as $d) {
-                $this->allSku[$d] = $d;
-            }
-        }
-
-        if (isset($this->allSku[$sku])) {
-            return true;
-        }
-
-        return false;
+        $this->notices[] = $value;
+        $this->logger->notice($value);
     }
 }

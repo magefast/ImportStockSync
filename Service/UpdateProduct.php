@@ -9,6 +9,7 @@ use Exception;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Store\Model\Store;
 use Magento\Store\Model\StoreManagerInterface;
+use Strekoza\ImportStockSync\Logger\Logger;
 
 class UpdateProduct
 {
@@ -63,22 +64,30 @@ class UpdateProduct
     private $totalRowToUpdate = 0;
 
     /**
+     * @var Logger
+     */
+    private $logger;
+
+    /**
      * @param StoreManagerInterface $storeManager
      * @param ProductCollectionFactory $productCollectionFactory
      * @param UpdateAttributes $updateAttributes
      * @param UpdateStock $updateStock
+     * @param Logger $logger
      */
     public function __construct(
         StoreManagerInterface    $storeManager,
         ProductCollectionFactory $productCollectionFactory,
         UpdateAttributes         $updateAttributes,
-        UpdateStock              $updateStock
+        UpdateStock              $updateStock,
+        Logger $logger
     )
     {
         $this->storeManager = $storeManager;
         $this->productCollectionFactory = $productCollectionFactory;
         $this->updateAttributes = $updateAttributes;
         $this->updateStock = $updateStock;
+        $this->logger = $logger;
     }
 
     /**
@@ -116,7 +125,8 @@ class UpdateProduct
             $sku = $d['sku'];
 
             if (!$this->checkIfSkuExists($sku, $websiteId)) {
-                $this->errors[] = $count . ' row. FAILURE:: Product with SKU (' . $sku . ') doesn\'t exist.';
+                $value = $count . ' row. FAILURE:: Product with SKU (' . $sku . ') doesn\'t exist.';
+                $this->addError($value);
                 continue;
             }
 
@@ -128,7 +138,8 @@ class UpdateProduct
 
                 $this->updatedCount++;
             } catch (Exception $e) {
-                $this->errors[] = $count . ' row. ERROR:: While updating  SKU (' . $sku . ') => ' . $e->getMessage();
+                $value = $count . ' row. ERROR:: While updating  SKU (' . $sku . ') => ' . $e->getMessage();
+                $this->addError($value);
             }
 
             $this->totalRowToUpdate--;
@@ -136,7 +147,8 @@ class UpdateProduct
 
         $this->updateStock->finalizeUpdateStock($websiteId);
 
-        $this->notices[] = __('Updated for Website ID: ' . $websiteId . '; Total updated count: ' . $this->updatedCount);
+        $value = __('Updated for Website ID: ' . $websiteId . '; Total updated count: ' . $this->updatedCount);
+        $this->addNotice($value);
     }
 
     /**
@@ -170,7 +182,7 @@ class UpdateProduct
         $data = $data['stock_data'];
 
         if (isset($data['qty'])) {
-            $this->updateStock->updateQty($id, $data['qty'], $data['is_in_stock'], $this->totalRowToUpdate);
+            $this->updateStock->updateQty($id, $data['qty'], $data['is_in_stock']);
             $this->updateStock->updateStatus($id, $data['is_in_stock'], $data['qty'], $websiteId);
         }
 
@@ -244,5 +256,23 @@ class UpdateProduct
     public function getUpdatedCount(): int
     {
         return $this->updatedCount;
+    }
+
+    /**
+     * @param $value
+     */
+    public function addError($value)
+    {
+        $this->errors[] = $value;
+        $this->logger->error($value);
+    }
+
+    /**
+     * @param $value
+     */
+    public function addNotice($value)
+    {
+        $this->notices[] = $value;
+        $this->logger->notice($value);
     }
 }

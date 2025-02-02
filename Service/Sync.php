@@ -13,6 +13,7 @@ use Magento\CatalogRule\Model\Indexer\Product\ProductRuleProcessor;
 use Magento\CatalogRule\Model\Indexer\Rule\RuleProductProcessor;
 use Magento\InventoryIndexer\Indexer\InventoryIndexer;
 use Magento\Store\Model\StoreManagerInterface;
+use Strekoza\ImportStockSync\Logger\Logger;
 
 class Sync
 {
@@ -82,6 +83,11 @@ class Sync
     private $flagSync;
 
     /**
+     * @var Logger
+     */
+    private $logger;
+
+    /**
      * @param Settings $settings
      * @param UpdateProduct $updateProduct
      * @param PrepareFileToImport $prepareFileToImport
@@ -92,6 +98,7 @@ class Sync
      * @param RuleProductProcessor $ruleProductIndexerProcessor
      * @param EavProcessor $eavIndexerProcessor
      * @param FlagSync $flagSync
+     * @param Logger $logger
      */
     public function __construct(
         Settings              $settings,
@@ -104,7 +111,8 @@ class Sync
         ProductRuleProcessor  $productRuleIndexerProcessor,
         RuleProductProcessor  $ruleProductIndexerProcessor,
         EavProcessor          $eavIndexerProcessor,
-        FlagSync              $flagSync
+        FlagSync              $flagSync,
+        Logger                $logger
     )
     {
         $this->settings = $settings;
@@ -118,6 +126,7 @@ class Sync
         $this->ruleProductIndexerProcessor = $ruleProductIndexerProcessor;
         $this->eavIndexerProcessor = $eavIndexerProcessor;
         $this->flagSync = $flagSync;
+        $this->logger = $logger;
     }
 
     /**
@@ -147,16 +156,24 @@ class Sync
     /**
      * @throws Exception
      */
-    public function run()
+    public function run(bool $skipFlag = false)
     {
-        if ($this->flagSync->get() == true) {
-            $this->errors[] = __('Sync is Running. Please try in 10 minutes.');
-            return;
+        if ($skipFlag !== true) {
+            if ($this->flagSync->get() == true) {
+                $this->addError(__('Sync is Running. Please try in 10 minutes.'));
+                return;
+            }
         }
 
         $this->flagSync->setFlag(1);
 
         $start = microtime(true);
+
+        $this->addNotice(__('Sync Start at: ') . date('m/d/Y h:i:s a'));
+
+        if ($skipFlag === true) {
+            $this->addNotice(__('started with cli command'));
+        }
 
         $this->syncData();
 
@@ -172,7 +189,25 @@ class Sync
         $this->flagSync->setFlag(0);
 
         $times = microtime(true) - $start;
-        $this->notices[] = __('Sync take time(sec.): ') . $times;
+        $this->addNotice(__('Sync take time(sec.): ') . $times);
+    }
+
+    /**
+     * @param $value
+     */
+    public function addError($value)
+    {
+        $this->errors[] = $value;
+        $this->logger->error($value);
+    }
+
+    /**
+     * @param $value
+     */
+    public function addNotice($value)
+    {
+        $this->notices[] = $value;
+        $this->logger->notice($value);
     }
 
     /**
@@ -189,14 +224,14 @@ class Sync
                 $file = $this->settings->getPathInternalFile($websiteId);
 
                 if (!file_exists($file)) {
-                    $this->errors[] = __('File Import not exist');
+                    $this->addError(__('File Import not exist'));
                     return;
                 }
 
                 $csvData = $this->prepareFileToImport->execute($file, $websiteId);
 
                 if (count($csvData) == 0) {
-                    $this->errors[] = __('Not rows to sync');
+                    $this->addError(__('Not rows to sync'));
                 }
 
                 $this->updateProduct->update($csvData, $websiteId);

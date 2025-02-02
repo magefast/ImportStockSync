@@ -36,12 +36,16 @@ class Sync
         $notices = $this->serviceSync->getNotices();
         $errors = $this->serviceSync->getErrors();
 
-        foreach ($notices as $notice) {
-            $this->logger->notice($notice);
+        if (is_array($notices)) {
+            foreach ($notices as $notice) {
+                $this->logger->notice($notice);
+            }
         }
 
-        foreach ($errors as $error) {
-            $this->logger->error($error);
+        if (is_array($errors)) {
+            foreach ($errors as $error) {
+                $this->logger->error($error);
+            }
         }
 
         $this->logger->info('Import Stock Sync - FINISH');

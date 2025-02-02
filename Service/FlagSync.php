@@ -1,7 +1,4 @@
 <?php
-/**
- * @author magefast@gmail.com www.magefast.com
- */
 
 namespace Strekoza\ImportStockSync\Service;
 

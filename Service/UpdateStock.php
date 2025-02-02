@@ -14,27 +14,18 @@ use Magento\Framework\DB\Adapter\AdapterInterface;
 class UpdateStock
 {
     public const TABLE_STOCK_ITEM = 'cataloginventory_stock_item';
-
-    /**
-     * @var array
-     */
-    private $stockValuesToUpdate = [];
-
-    /**
-     * @var int
-     */
-    private $dbCountLoop = 0;
-
-    /**
-     * @var int
-     */
-    private $dbCountQueryProcessing = 100;
-
     /**
      * @var Status
      */
     protected $stockStatusResource;
-
+    /**
+     * @var array
+     */
+    private $stockValuesToUpdate = [];
+    /**
+     * @var int
+     */
+    private $dbCountLoop = 0;
     /**
      * @var ResourceConnection
      */
@@ -60,9 +51,8 @@ class UpdateStock
      * @param $productId
      * @param $qty
      * @param $status
-     * @param $countRowToUpdate
      */
-    public function updateQty($productId, $qty, $status, $countRowToUpdate)
+    public function updateQty($productId, $qty, $status): void
     {
         $this->dbCountLoop++;
 
@@ -71,26 +61,26 @@ class UpdateStock
 
         $this->stockValuesToUpdate[] = ['where' => $where, 'bind' => $bind];
 
-        if ($this->dbCountLoop % $this->dbCountQueryProcessing == 0) {
-            if ($this->dbCountQueryProcessing <= $countRowToUpdate) {
+        $this->getConnection()->beginTransaction();
 
-                $this->getConnection()->beginTransaction();
-
-                foreach ($this->stockValuesToUpdate as $value) {
-                    $this->getConnection()->update(self::TABLE_STOCK_ITEM, $value['bind'], $value['where']);
-                }
-
-                $this->getConnection()->commit();
-
-                $this->stockValuesToUpdate = [];
-            }
+        foreach ($this->stockValuesToUpdate as $value) {
+            $this->getConnection()->update(self::TABLE_STOCK_ITEM, $value['bind'], $value['where']);
         }
 
-        if ($this->dbCountQueryProcessing > $countRowToUpdate) {
-            $this->getConnection()->beginTransaction();
-            $this->getConnection()->update(self::TABLE_STOCK_ITEM, $bind, $where);
-            $this->getConnection()->commit();
-        }
+        $this->getConnection()->commit();
+
+        $this->stockValuesToUpdate = [];
+    }
+
+    /**
+     * Get connection
+     *
+     * @return AdapterInterface
+     * @codeCoverageIgnore
+     */
+    private function getConnection(): AdapterInterface
+    {
+        return $this->connection->getConnection();
     }
 
     /**
@@ -117,17 +107,6 @@ class UpdateStock
             );
         }
         return $this->stockStatusResource;
-    }
-
-    /**
-     * Get connection
-     *
-     * @return AdapterInterface
-     * @codeCoverageIgnore
-     */
-    private function getConnection()
-    {
-        return $this->connection->getConnection();
     }
 
     public function finalizeUpdateStock($websiteId)
