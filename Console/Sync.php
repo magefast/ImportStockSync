@@ -41,7 +41,7 @@ class Sync extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->serviceSync->run();
+        $this->serviceSync->run(true);
 
         $errors = $this->serviceSync->getErrors();
         $notices = $this->serviceSync->getNotices();
